@@ -1,0 +1,14 @@
+node_modules/**/*
+node_modules/*.js
+node_modules/*.ts
+node_modules/*.json
+node_modules/.cache
+node_modules/.cache/*
+*.ts
+admin
+admin/**/*
+admin/*.js
+admin/*.json
+admin/.cache
+
+*.vue
