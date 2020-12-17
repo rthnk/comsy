@@ -26,6 +26,11 @@ authRouter.post('/login', localAuth, (req: IRequest, res: any) => {
 authRouter.post('/change-password', prepareUserInformation, checkCredentials, async (req: IRequest, res: any) => {
   const user: any = req.user;
   const User = getModel('User');
+  console.log({
+    username: user.username,
+    password_o: req.body.currentPassword,
+    password: sha256(req.body.currentPassword)
+  });
   const oldUser = await User.findOne({
     username: user.username,
     password: sha256(req.body.currentPassword)
@@ -52,7 +57,7 @@ authRouter.post('/register', async (req: IRequest, res: IResponse) => {
   if (oldUser) {
     return res.status(406).json(JSON_ERROR('Invalid new user information'))
   }
-  const confirm_token = uuidv4().replace(/\-/g, '');
+  const confirm_token = uuidv4().replace(/-/g, '');
   const newUserInfo = {
     username: req.body.username,
     firstname: req.body.firstname,

@@ -8,71 +8,6 @@ import { getModel } from '../database';
 import { Model } from 'mongoose';
 import { json } from 'express';
 
-const OLD_PERMISSIONS = {
-  resources: {
-    extends: [],
-    paths: [
-      '/api/v1/resources/(/.*)?'
-    ],
-    methods: [
-      'GET',
-    ]
-  },
-  reader: {
-    extends: ['resources'],
-    paths: [
-      '/api/v1/images(/.*)?',
-      '/api/v1/posts(/.*)?',
-      '/api/v1/galleries(/.*)?',
-      '/api/v1/subjects(/.*)?',
-      '/api/v1/resources(/.*)?',
-      '/api/v1/route(/.*)?',
-      '/api/v1/sitetypes(/.*)?',
-      '/api/v1/sites(/.*)?'
-    ],
-    methods: [
-      'GET',
-    ]
-  },
-  editor: {
-    extends: ['reader'],
-    paths: [
-      '/api/v1/images(/.*)?',
-      '/api/v1/galleries(/.*)?',
-      '/api/v1/subjects(/.*)?'
-    ],
-    methods: [
-      'POST',
-      'PUT',
-      'DELETE',
-    ]
-  },
-  map_editor: {
-    extends: ['reader'],
-    paths: [
-      '/api/v1/route(/.*)?',
-      '/api/v1/sitetypes(/.*)?',
-      '/api/v1/sites(/.*)?'
-    ],
-    methods: [
-      'POST',
-      'PUT',
-      'DELETE',
-    ]
-  },
-  writer: {
-    extends: ['resources'],
-    paths: [
-      '/api/v1/posts(/.*)?',
-    ],
-    methods: [
-      'POST',
-      'PUT',
-      'DELETE',
-    ]
-  }
-} as any;
-
 const opts = {
   secretOrKey: envConfig('JWT_SECRET'),
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -80,18 +15,6 @@ const opts = {
     expiresIn: envConfig('JWT_EXPIRES_TIME'),
     algorithm: 'HS256'
   }
-}
-
-const dummyUser = {
-  username: 'sampleuser',
-  password: 'samplepass1234*'
-}
-
-async function dummyValidation(username: any, password: any) {
-  if (username === dummyUser.username && password === dummyUser.password) {
-    return {username, password};
-  }
-  return null;
 }
 
 async function mongodbValidation(username: any, password?: any) {
@@ -205,7 +128,7 @@ function remapPermissions(acc: any, role: any) {
   return acc;
 }
 
-async function getPermissionsByRol(rol: string) {
+async function getPermissionsByRole(role: string) {
   // if (!(getPermissionsByRol as any).$cache) {
   //   (getPermissionsByRol as any).$cache = {};
   // }
@@ -224,7 +147,7 @@ async function getPermissionsByRol(rol: string) {
     };
     return acc;
   }, {});
-  const rolData = PERMISSIONS[rol] || {
+  const rolData = PERMISSIONS[role] || {
     extends: [],
     paths: [],
     methods: []
@@ -243,7 +166,7 @@ export async function acl(req: IRequest, res: IResponse, next: IHandler) {
   if (role === 'admin') {
     return next();
   } else {
-    const roleInfo = await getPermissionsByRol(role);
+    const roleInfo = await getPermissionsByRole(role);
     const isAllowed = roleInfo && roleInfo[req.method] &&
       roleInfo[req.method].reduce((acc: boolean, re: RegExp) => {
         return acc || re.test(req.originalUrl);

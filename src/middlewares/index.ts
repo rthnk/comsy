@@ -9,7 +9,7 @@ function logMiddleware(req: IRequest, _res: IResponse, next: IHandler): void {
 
 function allowRemotes(req: IRequest, res: IResponse, next: IHandler): void {
   const allowed = envConfig('ALLOW_CSP') || '';
-  res.set("Content-Security-Policy", `default-src 'self' ${allowed};`);
+  res.set("Content-Security-Policy", `default-src 'self' ${allowed} 'unsafe-inline' 'unsafe-eval'; img-src 'self' ${allowed} data:;`);
   next();
 }
 

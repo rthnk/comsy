@@ -4,6 +4,7 @@ import { config } from 'dotenv';
 import { v4 as uuid } from 'uuid';
 import { createHmac } from 'crypto';
 import chalk from 'chalk';
+import {plural} from 'pluralize';
 
 const _INFO_PACKAGE: any = {};
 
@@ -11,17 +12,25 @@ export function addInfo(key: string, value: string) {
   if (!_INFO_PACKAGE[key]) {
     _INFO_PACKAGE[key] = [];
   }
-  _INFO_PACKAGE[key].push(value);
+  if (!_INFO_PACKAGE[key].includes(value)) {
+    _INFO_PACKAGE[key].push(value);
+  }
 }
 
 export function getInfo(key: string, defaultValue: any[] = []) {
   return _INFO_PACKAGE[key] || defaultValue;
 }
 
-export function JSON_ERROR(errors: null | any | any[], data?: any, meta?: any): any {
-  const err = Array.isArray(errors) ? [...errors] : [errors];
-  const _errors = err.filter(e => !!e).map(e => e.message ? e.message : e);
-  const newData = data ? data : {};
+export function deleteInfoValue(key: string, value: string) {
+  const dValue = plural(value.toLowerCase());
+  _INFO_PACKAGE[key] = (_INFO_PACKAGE[key] || []).filter((evalue: string) => evalue !== dValue);
+  return _INFO_PACKAGE[key];                                                                                         
+}                                                                                                                    
+                                                                                                                     
+export function JSON_ERROR(errors: null | any | any[], data?: any, meta?: any): any {                                
+  const err = Array.isArray(errors) ? [...errors] : [errors];                                                        
+  const _errors = err.filter(e => !!e).map(e => e.message ? e.message : e);                                          
+  const newData = data ? data : {};                                                                                  
   if (!data) {
     newData.status = _errors.join('\n')
   }
@@ -145,3 +154,10 @@ export function debug(...values: any[]) {
     console.log(`${chalk.red(PREFIX)} ${final}\n`);
   }
 }
+
+export function titleCase(str:string) {
+  return str.toLowerCase().split(' ').map(function(word:string) {
+    return (word.charAt(0).toUpperCase() + word.slice(1));
+  }).join(' ');
+}
+

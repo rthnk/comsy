@@ -10,19 +10,25 @@ import { scaffoldModel } from '../logic/scaffolder';
 
 export class Server {
   private server: express.Application;
-  private port: Number;
+  private port: number;
   private middlewares: IHandler[] = [];
+  private routers: Map<string, IHandler>;
 
-  constructor(port: Number) {
+  constructor(port: number) {
     this.port = port;
+    this.routers = new Map();
     this.server = express();
     this.prepareMiddlewares();
   }
 
-  addRouters(routers: IRoute[]) {
+  addRouters(routers: IRoute[]): void {
     console.log('Routers:')
     routers.map((router: IRoute) => {
-      this.logRoute(router)
+      try {
+        this.logRoute(router)
+      } catch(error) {
+        console.log(error);
+      }
       this.server.use(router.path, router.router);
     });
   }
@@ -41,7 +47,7 @@ export class Server {
     return router;
   }
 
-  addMiddlewares(middlewares: IHandler[]) {
+  addMiddlewares(middlewares: IHandler[]): void {
     console.log('Loading extra middlewares');
     this.middlewares = middlewares;
     this.middlewares.map((middleware: IHandler) => {
@@ -49,48 +55,77 @@ export class Server {
     });
   }
 
-  prepareMiddlewares() {
+  prepareMiddlewares(): void {
     console.log('Loading base middlewares');
     this.server.use(express.json());
     this.server.use(express.urlencoded({ extended: true }));
     this.server.use(helmet());
-    // this.server.use(rateLimit({
-    //   windowMs: 60 * 60 * 1000, // 60 minutes
-    //   max: 1000, // limit each IP to 300 requests per windowMs
-    //   handler(req, res, next) {
-    //     console.log(req.url)
-    //   }
-    // }));
+    //**
+    this.server.use(rateLimit({
+      windowMs: 5 * 60 * 1000, // 5 minutes
+      max: 1000, // limit each IP to 300 requests per windowMs
+      handler(req: IRequest, res: IResponse, next: IHandler): void {
+        console.log(req.url);
+        next();
+      }
+    }));
+    // */
     this.server.use(cors());
     this.server.use(passport.initialize());
   }
 
-  scaffoldModels(models: String[]) {
-    console.log('Scaffolding');
-    const routers = models
-      .map((model: String) => scaffoldModel(model))
-      ;
-    routers
-      .map((router: any) => ({path: '/api/v1', router}))
-      .map((router: IRoute) => this.logRoute(router))
-      ;
+  scaffoldModels(models: string[]): void {
+    console.log('Mounting scaffolded models on server');
+    const routers = models.map((modelName: string) => scaffoldModel(modelName));
+    routers.forEach((router: any) => this.server.use('/api/v1', router));
     this.server.get('/api/v1/resources', (req: IRequest, res: IResponse) => {
+      const resources = getInfo('resources');
       res.status(200).json(JSON_ANSWER({
-        resources: getInfo('resources')
+        values: resources 
       }));
     });
-    routers.map((router: any) => this.server.use('/api/v1', router));
   }
 
-  errorHandler(error: Error, req: IRequest, res: IResponse, next: IHandler) {
+  scaffoldModelsOld(models: string[]): void {
+    console.log('Scaffolding');
+    const routers = models.map((model: string) => {
+      const baseRouter = scaffoldModel(model);
+      const handler: any = (req: IRequest, res: IResponse, next: IHandler) => {
+        baseRouter(req, res, next);
+      };
+      this.routers.set(model, handler);
+    });
+    routers
+      .forEach((router: any) => ({path: '/api/v1', router}))
+      // .map((router: IRoute) => this.logRoute(router))
+      ;
+    this.server.get('/api/v1/resources', (req: IRequest, res: IResponse) => {
+      const resources = getInfo('resources')
+        // .map((res: string) => res.toLowerCase())
+        // .filter((val:any, idx:number, slf:any[]) => slf.indexOf(val) === idx)
+        ;
+      // 
+      res.status(200).json(JSON_ANSWER({
+        resources 
+      }));
+    });
+    this.routers.forEach((router, route) => {
+      console.log(route, router);
+      this.server.use('/api/v1', router)
+    });
+    // routers.map((router: any) => this.server.use('/api/v1', router));
+  }
+
+  errorHandler(error: Error, req: IRequest, res: IResponse, next: IHandler): void {
     if (error) {
       console.error(`Critical Error: ${error}`);
-      return res.status(500).send(JSON_ERROR('Critical error, contact the adminitrator'));
+      res.status(500).send(JSON_ERROR('Critical error, contact the adminitrator'));
+    } else {
+      next(error);
     }
-    next(error);
   }
 
-  start() {
+  start(): void {
     this.server.use(this.errorHandler);
     this.server.listen(this.port, () => {
       console.log(`Listening at ${this.port}`)

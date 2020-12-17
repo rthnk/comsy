@@ -1,6 +1,7 @@
 import { Schema, model } from 'mongoose';
 
 export const PermissionsSchema = new Schema({
+  // role name
   name:  {
     type: String,
     required: true

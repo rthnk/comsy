@@ -2,94 +2,37 @@ import { plural } from 'pluralize';
 import { Router } from 'express';
 import { Model, mongo } from 'mongoose';
 import { getModel } from '../database';
-import { DataBaseError, IRequest, IResponse } from '../types';
+import { DataBaseError, IHandler, IRequest, IResponse } from '../types';
 import { addInfo, debug, JSON_ANSWER, JSON_ERROR, makeAWSFileLink, sha256 } from '../utils';
 import { FileSchema } from '../database/common';
 import { acl, prepareUserInformation } from '../middlewares/auth';
 
-function getUiField(fieldInfo: any) {
-  if (fieldInfo.type) {
-    const partial: string = fieldInfo.type.name || fieldInfo.type.constructor.name;
-    const value = partial.toLowerCase() === 'string' ? 'text' : partial.toLowerCase();
-    if (value) {
-      return value;
-    }
-  } 
-  return 'text'
+const scaffoldedModels = new Map<string, any>();
+
+export function removeScaffoldInstance(modelname: string): void {
+  scaffoldedModels.delete(modelname);
 }
 
-const getFieldType = (field: string, fieldInfo: any): any => {
-  const enumOptions = fieldInfo.enum;
-  const uiMeta = fieldInfo.uiMeta || {};
-  if (Array.isArray(fieldInfo) && fieldInfo[0]) {
-    return {
-      ...getFieldType(field, fieldInfo[0]),
-      required: fieldInfo[0].required,
-      enum: enumOptions,
-      uiMeta: {
-        ...uiMeta,
-        uiField: uiMeta.uiField || getUiField(fieldInfo) || getUiField(fieldInfo[0]),
-        isArray: true,
-      },
-    };
-  } else if (fieldInfo.type) {
-    if (fieldInfo.type.constructor.name === 'Array') {
-      return {
-        type: fieldInfo.type[0].name || fieldInfo.type.constructor.name,
-        isArray: true,
-        enum: enumOptions,
-        required: fieldInfo.required,
-        uiMeta: {
-          ...uiMeta,
-          uiField: uiMeta.uiField || getUiField(fieldInfo) || getUiField(fieldInfo[0]),
-          isArray: true,
-        },
-      }
-    } else if (fieldInfo.type.constructor.name === 'Schema') {
-        return {
-          isArray: false,
-          enum: enumOptions,
-          required: fieldInfo.required,
-          uiMeta: {
-            ...uiMeta,
-            uiField: uiMeta.uiField || getUiField(fieldInfo),
-          },
-        }
+export function scaffoldModel(modelname: string): Router {
+  const router = scaffoldedModels.get(modelname);
+  if (!router) {
+    scaffoldedModels.set(modelname, createRouterFromModelData(modelname));
+  }
+  return getRouterFromName(modelname);
+}
+
+function getRouterFromName(modelName: string): any {
+  return (req: IRequest, res: IResponse, next: IHandler) => {
+    const scaffolded = scaffoldedModels.get(modelName);
+    if (scaffolded) {
+      scaffolded(req, res, next);
     } else {
-      return {
-        type: fieldInfo.type.name || fieldInfo.type.constructor.name,
-        required: fieldInfo.required,
-        isArray: false,
-        enum: enumOptions,
-        uiMeta: {
-          ...uiMeta,
-          uiField: uiMeta.uiField || getUiField(fieldInfo),
-        },
-      };
+      next();
     }
-  } else {
-    return {
-      type: 'String',
-      isArray: false,
-      uiMeta: {
-        ...uiMeta,
-        uiField: uiMeta.uiField || getUiField(fieldInfo),
-      },
-    };
-  }
+  };
 }
 
-const getTypes = (object: any) => (acc: any, field: string) => {
-  const fieldInfo: any = object[field];
-  if (fieldInfo.editable !== false) {
-    acc['fullFields'][field] = getFieldType(field, fieldInfo);
-  } else {
-    acc['noEditableFields'][field] = getFieldType(field, fieldInfo);
-  }
-  return acc;
-}
-
-export function scaffoldModel(modelName: String) {
+export function createRouterFromModelData(modelName: string): Router {
   const modelname = modelName.toLowerCase();
   const resource = plural(modelname);
   const model: Model<any> = getModel(modelName);
@@ -354,7 +297,7 @@ export function scaffoldModel(modelName: String) {
         _id: new mongo.ObjectId(req.params.id)
       });
       if (instance) {
-        const deleted = await instance.delete();
+        const deleted = await instance.remove();
         return res.status(202).json(JSON_ANSWER({
           status: 202,
           message: `${modelname} with ID ${deleted._id} was deleted`
@@ -391,5 +334,89 @@ export function scaffoldModel(modelName: String) {
   router.delete.apply(router, [`/${resource}/:id`, ...middlewares, deleteItem]  as any);
 
   return router;
-
 }
+
+function getTypes(object: any) {
+  return (acc: any, field: string) => {
+    const fieldInfo: any = object[field];
+    if (fieldInfo.editable !== false) {
+      acc['fullFields'][field] = getFieldType(field, fieldInfo);
+    } else {
+      acc['noEditableFields'][field] = getFieldType(field, fieldInfo);
+    }
+    return acc;
+  }
+}
+
+function getFieldType(field: string, fieldInfo: any): any {
+  const enumOptions = fieldInfo.enum;
+  const uiMeta = fieldInfo.uiMeta || {};
+  if (Array.isArray(fieldInfo) && fieldInfo[0]) {
+    return {
+      ...getFieldType(field, fieldInfo[0]),
+      required: fieldInfo[0].required,
+      enum: enumOptions,
+      uiMeta: {
+        ...uiMeta,
+        uiField: uiMeta.uiField || getUiField(fieldInfo) || getUiField(fieldInfo[0]),
+        isArray: true,
+      },
+    };
+  } else if (fieldInfo.type) {
+    if (fieldInfo.type.constructor.name === 'Array') {
+      return {
+        type: fieldInfo.type[0].name || fieldInfo.type.constructor.name,
+        isArray: true,
+        enum: enumOptions,
+        required: fieldInfo.required,
+        uiMeta: {
+          ...uiMeta,
+          uiField: uiMeta.uiField || getUiField(fieldInfo) || getUiField(fieldInfo[0]),
+          isArray: true,
+        },
+      }
+    } else if (fieldInfo.type.constructor.name === 'Schema') {
+        return {
+          isArray: false,
+          enum: enumOptions,
+          required: fieldInfo.required,
+          uiMeta: {
+            ...uiMeta,
+            uiField: uiMeta.uiField || getUiField(fieldInfo),
+          },
+        }
+    } else {
+      return {
+        type: fieldInfo.type.name || fieldInfo.type.constructor.name,
+        required: fieldInfo.required,
+        isArray: false,
+        enum: enumOptions,
+        uiMeta: {
+          ...uiMeta,
+          uiField: uiMeta.uiField || getUiField(fieldInfo),
+        },
+      };
+    }
+  } else {
+    return {
+      type: 'String',
+      isArray: false,
+      uiMeta: {
+        ...uiMeta,
+        uiField: uiMeta.uiField || getUiField(fieldInfo),
+      },
+    };
+  }
+}
+
+function getUiField(fieldInfo: any) {
+  if (fieldInfo.type) {
+    const partial: string = fieldInfo.type.name || fieldInfo.type.constructor.name;
+    const value = partial.toLowerCase() === 'string' ? 'text' : partial.toLowerCase();
+    if (value) {
+      return value;
+    }
+  } 
+  return 'text'
+}
+

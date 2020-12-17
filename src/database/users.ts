@@ -17,17 +17,10 @@ export const UserSchema = new Schema({
   email:  String,
   confirm_token:  {
     type: String,
-    default: () => uuidv4().replace(/\-/g, '')
+    default: () => uuidv4().replace(/-/g, '')
   },
   role: {
     type: String,
-    enum: [
-      'admin',
-      'editor',
-      'reader',
-      'writer',
-      'map_editor'
-    ],
     default: 'reader'
   },
   active: {

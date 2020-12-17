@@ -1,7 +1,7 @@
 import { Request, Router, Response as EResponse, NextFunction } from 'express';
 
 export class DataBaseError implements Error {
-  name: string = 'DatabaseError';
+  name = 'DatabaseError';
   message: string;
   stack?: string | undefined;
 
@@ -13,10 +13,10 @@ export class DataBaseError implements Error {
 export interface IDBConnectionInfo {
   username: string,
   password: string,
-  host: String,
-  port: Number,
-  database: String,
-  protocol: String
+  host: string,
+  port: number,
+  database: string,
+  protocol: string
 }
 
 export interface IRoute {
@@ -24,8 +24,12 @@ export interface IRoute {
   router: Router
 }
 
-export interface IRequest extends Request {}
+// export interface IRequest extends Request {}
+export type IRequest = Request;
 
-export interface IResponse extends EResponse {}
+// export interface IResponse extends EResponse {}
+export type IResponse = EResponse;
 
-export interface IHandler extends NextFunction {}
+// export interface IHandler extends NextFunction {}
+export type IHandler = NextFunction;
+
